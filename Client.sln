@@ -1,0 +1,32 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2010
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Client", "Client.csproj", "{2E7E521F-030A-44F6-B09D-440BEDEAAD7D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LipiSCComm", "LipiSCComm\LipiSCComm.csproj", "{0DC81B09-3ABF-4BB3-8C08-4E8EE4432BDC}"
+EndProject
+Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "RemoteClientSetup", "..\RemoteClientSetup\RemoteClientSetup.vdproj", "{75716D14-6949-4C92-8F03-3A3B67F83E40}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{2E7E521F-030A-44F6-B09D-440BEDEAAD7D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2E7E521F-030A-44F6-B09D-440BEDEAAD7D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2E7E521F-030A-44F6-B09D-440BEDEAAD7D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2E7E521F-030A-44F6-B09D-440BEDEAAD7D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0DC81B09-3ABF-4BB3-8C08-4E8EE4432BDC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0DC81B09-3ABF-4BB3-8C08-4E8EE4432BDC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0DC81B09-3ABF-4BB3-8C08-4E8EE4432BDC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0DC81B09-3ABF-4BB3-8C08-4E8EE4432BDC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{75716D14-6949-4C92-8F03-3A3B67F83E40}.Debug|Any CPU.ActiveCfg = Debug
+		{75716D14-6949-4C92-8F03-3A3B67F83E40}.Debug|Any CPU.Build.0 = Debug
+		{75716D14-6949-4C92-8F03-3A3B67F83E40}.Release|Any CPU.ActiveCfg = Release
+		{75716D14-6949-4C92-8F03-3A3B67F83E40}.Release|Any CPU.Build.0 = Release
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
