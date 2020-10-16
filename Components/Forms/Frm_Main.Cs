@@ -78,6 +78,9 @@ namespace Client
         string Port_No = "";
 
         string KioskIP = "";
+        string klat = "";
+        string klong = "";
+        string KioskLocation = "";
         string LastPatchUpdated = "";
         string KioskID = "";       
         string DownloadPath = "";
@@ -316,6 +319,9 @@ namespace Client
             try
             {
                 KioskIP = LocalIPAddress();
+                KioskLocation= objClientConfigINI.Read("Kiosk_Details", "Location", "");
+                klat= objClientConfigINI.Read("Kiosk_Details", "lat", "");
+                klong= objClientConfigINI.Read("Kiosk_Details", "long", "");
                 KioskID = GetMACAddress(); //objClientConfigINI.Read("Kiosk_Details", "Kiosk_ID", "");
                 KioskMachineSrNo = "Lipi" + KioskID; //objClientConfigINI.Read("Kiosk_Details", "KioskMachine_SrNo", "");
                 RMS_ServerInfo = objClientConfigINI.Read("Kiosk_Details", "ServiceUrl", ""); 
@@ -604,10 +610,10 @@ namespace Client
                                     {
                                         objLog.WriteFile("Patch name received - " + objPatchName.PatchName);
                                         
-                                        if (!Directory.Exists(DownloadPath))
-                                            Directory.CreateDirectory(DownloadPath);
+                                        if (!Directory.Exists(DownloadPath+"\\PATCH\\"))
+                                            Directory.CreateDirectory(DownloadPath + "\\PATCH\\");
 
-                                        File.WriteAllBytes(DownloadPath + objPatchName.PatchName, Convert.FromBase64String(objPatchName.PatchData));
+                                        File.WriteAllBytes(DownloadPath + "\\PATCH\\" + objPatchName.PatchName, Convert.FromBase64String(objPatchName.PatchData));
                                         objLog.WriteFile("File saved:" + objPatchName.PatchName);
 
                                         LipiPatchUpdateAck(LocalIPAddress(), KioskMachineSrNo, "Client");
@@ -652,11 +658,11 @@ namespace Client
                                         {   
                                             objLog.WriteFile("Monitor zip file rcvd- " + objNewMonitorPatchName.PatchName);
 
-                                            if (!Directory.Exists(DownloadPath))
-                                                Directory.CreateDirectory(DownloadPath);
+                                            if (!Directory.Exists(DownloadPath + "\\PATCH\\"))
+                                                Directory.CreateDirectory(DownloadPath + "\\PATCH\\");
 
                                             //save zip file received
-                                            File.WriteAllBytes(DownloadPath + objNewMonitorPatchName.PatchName, Convert.FromBase64String(objNewMonitorPatchName.PatchData));
+                                            File.WriteAllBytes(DownloadPath + "\\PATCH\\" + objNewMonitorPatchName.PatchName, Convert.FromBase64String(objNewMonitorPatchName.PatchData));
                                             objClientConfigINI.Write("Kiosk_Details", "Last_PatchReceived", objNewMonitorPatchName.PatchName);
                                             objLog.WriteFile("File saved:" + objNewMonitorPatchName.PatchName);
 
@@ -865,7 +871,7 @@ namespace Client
                     }
                     finally
                     {
-                        Thread.Sleep(1 * 60 * 1000);
+                       Thread.Sleep(1 * 60 * 1000);
                     }
                 }
             }
@@ -2083,7 +2089,12 @@ namespace Client
                 }
             }
 
+           
+
             strClientDetails += "#" + LastPatchUpdated;   // Last Patch Updated
+            strClientDetails += "#" + KioskLocation; //Kiosk Location
+            strClientDetails += "#" + klat; //Kiosk Location
+            strClientDetails += "#" + klong; //Kiosk Location
         }
               
         void Connect()
