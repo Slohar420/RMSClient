@@ -1,35 +1,35 @@
 #region > Imported Libraries <
-    using System;
-    using System.IO;
-    using System.Net;
-    using System.Data;
-    using System.Text;
-    using System.Drawing;
-    using Microsoft.Win32;
-    using System.Collections;
-    using System.Windows.Forms;
-    using System.ComponentModel;
-    using System.Runtime.InteropServices;
-    using Client.Components.Classes;
-    using System.Diagnostics;
-    using System.Collections.Generic;
-    using System.Threading;
-    using Ionic.Zip;
-    using System.Net.Security;
-    using System.Linq;
-    using System.Reflection;
-    using System.Net.Sockets;
-    using Lipi.Communication.Scs.Client;
-    using Lipi.Communication.Scs.Communication.EndPoints.Tcp;
-    using Lipi.Communication.Scs.Communication.Messages;
-    using System.Net.NetworkInformation;
-    using System.Xml;
-    using System.Security.Cryptography;
-    using Microsoft.VisualBasic.Devices;
-    using System.Management;
-    using System.ServiceProcess;
-    using System.Runtime.Serialization.Json;
-    using System.Security.AccessControl;
+using System;
+using System.IO;
+using System.Net;
+using System.Data;
+using System.Text;
+using System.Drawing;
+using Microsoft.Win32;
+using System.Collections;
+using System.Windows.Forms;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+using Client.Components.Classes;
+using System.Diagnostics;
+using System.Collections.Generic;
+using System.Threading;
+using Ionic.Zip;
+using System.Net.Security;
+using System.Linq;
+using System.Reflection;
+using System.Net.Sockets;
+using Lipi.Communication.Scs.Client;
+using Lipi.Communication.Scs.Communication.EndPoints.Tcp;
+using Lipi.Communication.Scs.Communication.Messages;
+using System.Net.NetworkInformation;
+using System.Xml;
+using System.Security.Cryptography;
+using Microsoft.VisualBasic.Devices;
+using System.Management;
+using System.ServiceProcess;
+using System.Runtime.Serialization.Json;
+using System.Security.AccessControl;
 using Newtonsoft.Json;
 #endregion
 
@@ -51,12 +51,14 @@ namespace Client
 
         private const int SC_CLOSE = 0xf060;
         private const int WM_SYSCOMMAND = 0x0112;
+        private const int WM_ENDSESSION = 0x11;
+        private const int WM_QUERYENDSESSION = 0x11;
 
-        FileSystemWatcher _fileWatcherHealth = null;     
+        FileSystemWatcher _fileWatcherHealth = null;
 
         //string AssemblyPath = "";
         string ClientConfigINIPath = "";
-        string ClientHealthINIPath = "";      
+        string ClientHealthINIPath = "";
 
         //bool bFormMinimized = false;
 
@@ -78,18 +80,21 @@ namespace Client
         string Port_No = "";
 
         string KioskIP = "";
+        string StartTime = "";
+        string EndTime = "";
+        string UpHours = "";
         string klat = "";
         string klong = "";
         string KioskLocation = "";
         string LastPatchUpdated = "";
-        string KioskID = "";       
+        string KioskID = "";
         string DownloadPath = "";
-        string VendorName = "";        
+        string VendorName = "";
         string strTV_IP = "";
-        int nConnectInter = 0;     
+        int nConnectInter = 0;
         string strMacAddress = "";
-       
-        
+
+
         //Mass Storage
         [DllImport("user32.dll")]
         private static extern IntPtr SendMessageTimeout(IntPtr hWnd, int Msg, IntPtr wParam, string lParam, uint fuFlags, uint uTimeout, IntPtr lpdwResult);
@@ -106,10 +111,10 @@ namespace Client
         //private UInt16 UIntChecksum = 0;
 
         INIFile objClientConfigINI = null;
-        INIFile objClientHealthINI = null; 
+        INIFile objClientHealthINI = null;
         object objlock = new object();
         int iSleepMode = 0;
-      
+
 
         //Dll and Variables used for Patch Installation
         public static List<string> ZipEntryList;
@@ -200,28 +205,30 @@ namespace Client
             //Memory Initialize Object
             if (objLog == null)
                 objLog = new Log();
-            
-            ClientConfigINIPath = Application.StartupPath  + "\\KioskClientConfig.ini";
+
+            ClientConfigINIPath = Application.StartupPath + "\\KioskClientConfig.ini";
             ClientHealthINIPath = Application.StartupPath + "\\KioskClientHealth.ini";
+
 
             if (objClientConfigINI == null)
                 objClientConfigINI = new INIFile(ClientConfigINIPath);
-            
-            if (objClientHealthINI == null)
-                objClientHealthINI = new INIFile(ClientHealthINIPath);           
 
-        }       
-        
+            if (objClientHealthINI == null)
+                objClientHealthINI = new INIFile(ClientHealthINIPath);
+
+        }
+
 
         private void Frm_Main_Load(object sender, EventArgs e)
         {
             try
             {
+
                 this.Text = "Lipi Remote Client V" + Assembly.GetExecutingAssembly().GetName().Version.ToString();
                 notifyIcon1.Text = this.Text;
-                
+
                 objLog.WriteFile("****************" + this.Text + "*****************");
-             
+
                 strMacAddress = GetMACAddress();
                 objLog.WriteFile("Mac Address:" + strMacAddress);
 
@@ -230,7 +237,7 @@ namespace Client
                     objClientConfigINI.Write("Kiosk_Details", "PreviousDate", DateTime.Now.ToString("dd_MM_yyyy"));
 
                 GetLogicalDrives();
-                
+
                 ReadKioskDetails();
 
                 //Connect();   //Client Connect Directly No wait 10 Sec...
@@ -257,7 +264,7 @@ namespace Client
                 if (thTxnHealth == null)
                     thTxnHealth = new Thread(new ThreadStart(ServiceThreadTxnHealth));
 
-               thTxnHealth.Start();
+                thTxnHealth.Start();
 
                 if (_fileWatcherHealth == null)
                     _fileWatcherHealth = new FileSystemWatcher();
@@ -281,6 +288,9 @@ namespace Client
                 bKeyHooking = false;
                 int hwnd = FindWindow("Shell_TrayWnd", "");
                 ShowWindow(hwnd, SW_HIDE);
+
+                objClientConfigINI.Write("Kiosk_Details", "StartTime", DateTime.Now.ToString("ddMMyyyy_") + "000001");
+                objClientConfigINI.Write("Kiosk_Details", "EndTime", DateTime.Now.ToString("ddMMyyyy_") + "230059");
             }
             catch (Exception ex)
             {
@@ -319,12 +329,14 @@ namespace Client
             try
             {
                 KioskIP = LocalIPAddress();
-                KioskLocation= objClientConfigINI.Read("Kiosk_Details", "Location", "");
-                klat= objClientConfigINI.Read("Kiosk_Details", "lat", "");
-                klong= objClientConfigINI.Read("Kiosk_Details", "long", "");
+                StartTime = objClientConfigINI.Read("Kiosk_Details", "StartTime", "");
+                EndTime = objClientConfigINI.Read("Kiosk_Details", "EndTime", "");
+                KioskLocation = objClientConfigINI.Read("Kiosk_Details", "Location", "");
+                klat = objClientConfigINI.Read("Kiosk_Details", "lat", "");
+                klong = objClientConfigINI.Read("Kiosk_Details", "long", "");
                 KioskID = GetMACAddress(); //objClientConfigINI.Read("Kiosk_Details", "Kiosk_ID", "");
                 KioskMachineSrNo = "Lipi" + KioskID; //objClientConfigINI.Read("Kiosk_Details", "KioskMachine_SrNo", "");
-                RMS_ServerInfo = objClientConfigINI.Read("Kiosk_Details", "ServiceUrl", ""); 
+                RMS_ServerInfo = objClientConfigINI.Read("Kiosk_Details", "ServiceUrl", "");
                 LastPatchUpdated = objClientConfigINI.Read("Kiosk_Details", "Last_PatchReceived", "");
                 WebHostIP = objClientConfigINI.Read("Server_Details", "RMSServer_IP", "");
                 Port_No = objClientConfigINI.Read("Server_Details", "Port_No", "");
@@ -338,14 +350,14 @@ namespace Client
                 objLog.WriteFile("Web Service URL : " + RMS_ServerInfo);
                 objLog.WriteFile("RMS Server IP : " + WebHostIP);
                 objLog.WriteFile("RMS Port : " + Port_No);
-                objLog.WriteFile("DownloadPath:" + DownloadPath);                
+                objLog.WriteFile("DownloadPath:" + DownloadPath);
             }
             catch (Exception ex)
             {
                 objLog.WriteFile("Exception in ReadKioskDetails : " + ex.Message + Environment.NewLine + ex.StackTrace);
             }
-        }       
-        
+        }
+
         void UpdateCommandsFromFile(string strCommandFilePath)
         {
             try
@@ -384,7 +396,7 @@ namespace Client
                 objLog.WriteFile("UpdateCommandsFromFile() exception- " + ex.Message + Environment.NewLine + ex.StackTrace);
             }
         }
-      
+
         public string LocalIPAddress()
         {
             IPHostEntry host;
@@ -407,7 +419,7 @@ namespace Client
         }
 
         private void TCPConnectivityThread()
-        {          
+        {
             int nTimeInt = 1000 * 60;
             int iWaitTime = 0;
 
@@ -510,7 +522,7 @@ namespace Client
                 {
                     strRet = "Disconnected";
                     objLog.WriteFile("TV ping error: " + reply.Status);
-                }                
+                }
             }
             catch (Exception ex)
             {
@@ -519,7 +531,7 @@ namespace Client
             }
             return strRet;
         }
-      
+
         private void ServiceThreadTxnHealth()
         {
             lock (objlock)
@@ -533,8 +545,8 @@ namespace Client
                         {
                             try
                             {
-                                bool bTouchScreenFound = false;
-
+                                objClientConfigINI.Write("Kiosk_Details", "StartTime", DateTime.Now.ToString("ddMMyyyy_") + "000001");
+                                objClientConfigINI.Write("Kiosk_Details", "EndTime", DateTime.Now.ToString("ddMMyyyy_") + "230059");
                                 //ManagementObjectSearcher deviceList = new ManagementObjectSearcher("Select Name, Status, DeviceID from Win32_PnPEntity");
 
                                 //string DevName_Touch = objClientHealthINI.Read("Device_DriverName", "TouchScreen", "");                               
@@ -571,18 +583,42 @@ namespace Client
                                 string strTemp = objClientHealthINI.Read("Health_Details", "D" + (iCount + 1), "");
                                 strDeviceData += "#" + (strTemp != "" ? strTemp : "Unknown");
                             }
-                                                      
 
-                           
+                            if (objClientConfigINI.Read("Kiosk_Details", "StartTime", "").Split('_')[0].Trim() == DateTime.Today.ToString("ddMMyyyy"))
+                            {
+                                int healthSentCount = Convert.ToInt32(objClientConfigINI.Read("Kiosk_Details", "healthSentCount", "0")) + 1;
+                                double healthSentPercentage = healthSentCount * 100 / 48;
+                                double UpTime = healthSentCount * 30;
+
+                                TimeSpan elapsed = TimeSpan.FromMinutes(UpTime);
+                                UpHours = elapsed.ToString().Replace(":", "");
+                                objClientConfigINI.Write("Kiosk_Details", "UpTime", UpHours.ToString());
+                                objClientConfigINI.Write("Kiosk_Details", "healthSentCount", healthSentCount.ToString());
+                            }
+                            else
+                            {
+                                objClientConfigINI.Write("Kiosk_Details", "UpTime", "0");
+                                objClientConfigINI.Write("Kiosk_Details", "healthSentCount", "0");
+                            }
 
                             //Now Sending The Health Data
                             string HealthData = "02"
                                                    + "$" + KioskIP
                                                    + "$" + KioskMachineSrNo
                                                    + "$" + DateTime.Now.ToString("yyyyMMdd HH:mm:ss")
-                                                   + "$" + objClientHealthINI.Read("Health_Details", "DeviceCount","0");
+                                                   + "$" + objClientHealthINI.Read("Health_Details", "DeviceCount", "0")
+                                                   + strDeviceData
+                                                   + "$" + EndTime
+                                                   + "$" + StartTime
+                                                   + "$" + UpHours
+                                                   + "$" + objClientConfigINI.Read("Kiosk_Details", "long", "")
+                                                   + "$" + objClientConfigINI.Read("Kiosk_Details", "lat", "")
+                                                   + "$" + objClientConfigINI.Read("Kiosk_Details", "Address", "")
+                                                   + "$" + objClientConfigINI.Read("Kiosk_Details", "City", "")
+                                                   + "$" + objClientConfigINI.Read("Kiosk_Details", "State", "")
+                                                   + "$" + objClientConfigINI.Read("Kiosk_Details", "Kiosk_ID", "");
 
-                            HealthData += strDeviceData;
+
                             objLog.WriteFile("HealthData  Message For Sending:- " + HealthData);
 
                             try
@@ -598,19 +634,18 @@ namespace Client
                                 strURL = RMS_ServerInfo + "/HealthData";
                                 string result = objWC.UploadString(strURL, "POST", "\"" + strbase64 + "\"");
 
-                                objLog.WriteFile("HealthData Response Recieved : " + result);
 
                                 MemoryStream memstrToReceive = new MemoryStream(Encoding.UTF8.GetBytes(result));
                                 DataContractJsonSerializer objJsonSerRecv = new DataContractJsonSerializer(typeof(ResLipiHealth));
-                                ResLipiHealth objPatchName = (ResLipiHealth)objJsonSerRecv.ReadObject(memstrToReceive);                                
-
+                                ResLipiHealth objPatchName = (ResLipiHealth)objJsonSerRecv.ReadObject(memstrToReceive);
+                                objLog.WriteFile("HealthData Response Recieved : " + objPatchName.Result);
                                 if (objPatchName.Result)
-                                {   
+                                {
                                     if (objPatchName.PatchName != null && objPatchName.PatchName != "")
                                     {
                                         objLog.WriteFile("Patch name received - " + objPatchName.PatchName);
-                                        
-                                        if (!Directory.Exists(DownloadPath+"\\PATCH\\"))
+
+                                        if (!Directory.Exists(DownloadPath + "\\PATCH\\"))
                                             Directory.CreateDirectory(DownloadPath + "\\PATCH\\");
 
                                         File.WriteAllBytes(DownloadPath + "\\PATCH\\" + objPatchName.PatchName, Convert.FromBase64String(objPatchName.PatchData));
@@ -634,7 +669,7 @@ namespace Client
 
                                         objWC.Headers[HttpRequestHeader.ContentType] = "text/json";
 
-                                        EncRequest req = new EncRequest() { RequestData =JsonConvert.SerializeObject(KioskMachineSrNo + "#" + LocalIPAddress()) };
+                                        EncRequest req = new EncRequest() { RequestData = JsonConvert.SerializeObject(KioskMachineSrNo + "#" + LocalIPAddress()) };
                                         string jsondata = JsonConvert.SerializeObject(req);
 
                                         //check if monitor update available 
@@ -655,7 +690,7 @@ namespace Client
                                         if (objNewMonitorPatchName.Result &&
                                             objNewMonitorPatchName.PatchName != null &&
                                             objNewMonitorPatchName.PatchName != "")
-                                        {   
+                                        {
                                             objLog.WriteFile("Monitor zip file rcvd- " + objNewMonitorPatchName.PatchName);
 
                                             if (!Directory.Exists(DownloadPath + "\\PATCH\\"))
@@ -677,7 +712,7 @@ namespace Client
                                             LipiPatchUpdateAck(LocalIPAddress(), KioskMachineSrNo, "Monitor");
                                         }
                                         else
-                                        { 
+                                        {
                                             objLog.WriteFile("No monitor patch recevied");
 
                                             objLog.WriteFile("Now Checking for the Lipi RD Service");
@@ -689,16 +724,16 @@ namespace Client
 
                                             objWC.Headers[HttpRequestHeader.ContentType] = "text/json";
 
-                                            EncRequest encRequest = new EncRequest() {RequestData= AesGcm256.Encrypt(JsonConvert.SerializeObject( KioskMachineSrNo + "#" + LocalIPAddress())) };
+                                            EncRequest encRequest = new EncRequest() { RequestData = AesGcm256.Encrypt(JsonConvert.SerializeObject(KioskMachineSrNo + "#" + LocalIPAddress())) };
                                             jsondata = JsonConvert.SerializeObject(encRequest);
                                             //check if monitor update available 
                                             result = objWC.UploadString(RMS_ServerInfo + "/CheckLipiRDService", "POST", jsondata);
 
                                             memstrToReceive = new MemoryStream(Encoding.UTF8.GetBytes(result));
                                             objJsonSerRecv = new DataContractJsonSerializer(typeof(EncResponse));
-                                             encResponse = (EncResponse)objJsonSerRecv.ReadObject(memstrToReceive);
+                                            encResponse = (EncResponse)objJsonSerRecv.ReadObject(memstrToReceive);
 
-                                             decData = AesGcm256.Decrypt(encResponse.ResponseData);
+                                            decData = AesGcm256.Decrypt(encResponse.ResponseData);
 
                                             ResLipiRDServiceUpdate objLipiRDServicePatchName = JsonConvert.DeserializeObject<ResLipiRDServiceUpdate>(decData);
 
@@ -728,12 +763,12 @@ namespace Client
 
                                                 objWC.Headers[HttpRequestHeader.ContentType] = "text/json";
 
-                                                encRequest = new EncRequest() { RequestData= AesGcm256.Encrypt( Newtonsoft.Json.JsonConvert.SerializeObject( LocalIPAddress()))};
+                                                encRequest = new EncRequest() { RequestData = AesGcm256.Encrypt(Newtonsoft.Json.JsonConvert.SerializeObject(LocalIPAddress())) };
                                                 string json = Newtonsoft.Json.JsonConvert.SerializeObject(encRequest);
 
                                                 result = objWC.UploadString(RMS_ServerInfo + "/GetCommand", "POST", json);
 
-                                             
+
 
                                                 memstrToReceive = new MemoryStream(Encoding.UTF8.GetBytes(result));
                                                 objJsonSerRecv = new DataContractJsonSerializer(typeof(EncResponse));
@@ -742,9 +777,9 @@ namespace Client
                                                 decData = AesGcm256.Decrypt(encResponse.ResponseData);
                                                 objLog.WriteFile("GetCommand Response : " + decData);
 
-                                                 result= JsonConvert.DeserializeObject<string>(decData);
+                                                result = JsonConvert.DeserializeObject<string>(decData);
 
-                                                objLog.WriteFile("Call  ExecuteCommands ");
+                                                objLog.WriteFile("Call  ExecuteCommands");
                                                 ExecuteCommands(result);
                                             }
                                         }
@@ -775,14 +810,13 @@ namespace Client
                                 thEstablishedNetwork.Start();
                             }
 
-                            //iSleepMode = 1 * 60 * 1000;  
-                            iSleepMode =  3000;  
+                            iSleepMode = 1 * 60 * 1000;
                         }
                     }
                     catch (Exception ex)
                     {
                         objLog.WriteFile("Exception Occurs ServiceThreadTxnHealth:- " + ex.Message + "," + ex.StackTrace);
-                    }    
+                    }
                     finally
                     {
                         Thread.Sleep(iSleepMode);
@@ -862,7 +896,7 @@ namespace Client
                                 bIsServiceConnectivityPresent = true;
                                 IsKeepAlive = false;
                             }
-                        }                      
+                        }
                     }
                     catch (Exception excp)
                     {
@@ -871,11 +905,11 @@ namespace Client
                     }
                     finally
                     {
-                       Thread.Sleep(1 * 60 * 1000);
+                        Thread.Sleep(1 * 60 * 1000);
                     }
                 }
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 objLog.WriteFile("CheckNetwotkConnectivity - " + ex.Message + ",," + ex.StackTrace);
             }
@@ -1379,7 +1413,7 @@ namespace Client
                                         UnhookWindowsHookEx(ptrHook);
                                         bKeyHooking = false;
                                         objLog.WriteFile("Keyboard enable");
-                                        SetKey(TaskManager.Enabled);                                        
+                                        SetKey(TaskManager.Enabled);
                                     }
                                     else
                                     {
@@ -1388,7 +1422,7 @@ namespace Client
                                         //ptrHook = SetWindowsHookEx(13, objKeyboardProcess, GetModuleHandle(objCurrentModule.ModuleName), 0);
                                         bKeyHooking = true;
                                         objLog.WriteFile("Keyboard disable");
-                                        SetKey(TaskManager.Disabled);                                       
+                                        SetKey(TaskManager.Disabled);
                                     }
                                 }
                                 break;
@@ -1526,7 +1560,7 @@ namespace Client
 
                         LipiCommandUpdateAck(LocalIPAddress());
                     }
-                    break;               
+                    break;
             }
 
         }
@@ -1761,7 +1795,7 @@ namespace Client
                 objLogDetails.ClientIP = strClientIP;
                 objLogDetails.Filename = strFileName.Substring(strFileName.LastIndexOf("\\") + 1);
                 objLogDetails.Logdata = Convert.ToBase64String(File.ReadAllBytes(strFileName));
-                
+
                 WebClient objWC = new WebClient();
                 DataContractJsonSerializer ser = new DataContractJsonSerializer(typeof(LogDetails));
                 MemoryStream stream1 = new MemoryStream();
@@ -1790,7 +1824,7 @@ namespace Client
             {
                 string strSendData = strClientIP + "#" + strMachineSerialNo + "#" + strUpdateType;
 
-                EncRequest encRequest = new EncRequest() {RequestData=AesGcm256.Encrypt(JsonConvert.SerializeObject(strSendData)) };
+                EncRequest encRequest = new EncRequest() { RequestData = AesGcm256.Encrypt(JsonConvert.SerializeObject(strSendData)) };
                 string jsonData = JsonConvert.SerializeObject(encRequest);
 
                 WebClient objWC = new WebClient();
@@ -1799,7 +1833,7 @@ namespace Client
                 string result = objWC.UploadString(strURL, "POST", jsonData);
                 objLog.WriteFile("LipiPatchUpdateAck Response : " + result);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 objLog.WriteFile("Exception in LipiPatchUpdateAck Response : " + ex.Message);
             }
@@ -1807,7 +1841,7 @@ namespace Client
         public void LipiCommandUpdateAck(string strClientIP)
         {
             try
-            {   
+            {
                 WebClient objWC = new WebClient();
                 objWC.Headers[HttpRequestHeader.ContentType] = "text/json";
                 string strURL = RMS_ServerInfo + "/LipiCommandAck";
@@ -1818,7 +1852,7 @@ namespace Client
             {
                 objLog.WriteFile("Exception in LipiCommandUpdateAck Response : " + ex.Message);
             }
-        }       
+        }
 
         public void OnChangedHealth(object source, FileSystemEventArgs e)
         {
@@ -1896,7 +1930,7 @@ namespace Client
             }
             finally
             {
-                _fileWatcherHealth.EnableRaisingEvents = true;               
+                _fileWatcherHealth.EnableRaisingEvents = true;
             }
         }
 
@@ -1934,13 +1968,13 @@ namespace Client
             if (keyData == (Keys.Control | Keys.Q))
             {
                 objLog.WriteFile("*******************Application Close********************");
-                Process.GetCurrentProcess().Kill();                
+                Process.GetCurrentProcess().Kill();
                 return true;
             }
             return base.ProcessCmdKey(ref msg, keyData);
         }
 
-        protected override void WndProc(ref System.Windows.Forms.Message message)
+        protected override void WndProc(ref Message message)
         {
             switch (message.Msg)
             {
@@ -1954,10 +1988,13 @@ namespace Client
                     }
 
                     break;
+                case WM_QUERYENDSESSION:
+                    objClientConfigINI.Write("Kiosk_Details", "EndTime", DateTime.Now.ToString("ddMMyyyy_hhMMss"));
+                    break;
             }
             base.WndProc(ref message);
         }
-        
+
         private void settingsToolStripMenuItem_Click(object sender, EventArgs e)
         {
             //this.UseWaitCursor = false; Application.DoEvents();
@@ -1965,7 +2002,7 @@ namespace Client
             //this.ShowInTaskbar = false;
             //this.WindowState = FormWindowState.Normal;
         }
-        
+
 
 
         public static bool IsValidIP(string ipAddress)
@@ -2020,32 +2057,32 @@ namespace Client
         }
 
         public string GetLipiRDService_Version()
-        {   
+        {
             try
             {
                 //Get Lipi RD Service version
                 FileVersionInfo objFileVersion;
                 objFileVersion = FileVersionInfo.GetVersionInfo("C:\\LipiRDService\\LipiRDService.exe");
-                return "RD" + objFileVersion.FileVersion;                
+                return "RD" + objFileVersion.FileVersion;
             }
             catch { return "NA" + "/"; }
         }
 
         public string GetLipiRMSMonitor_Version()
-        {   
+        {
             try
             {
                 //Get Client monitor version
                 FileVersionInfo objFileVersion;
                 objFileVersion = FileVersionInfo.GetVersionInfo(Application.StartupPath + @"\RMSClientMonitor.exe");
-                return "M" + objFileVersion.FileVersion;                
+                return "M" + objFileVersion.FileVersion;
             }
             catch { return "NA" + "/"; }
         }
-       
+
         //Build Client Details
         void BuildClientDetail()
-        {   
+        {
             ReadKioskDetails();
 
             strClientDetails = "";
@@ -2063,7 +2100,7 @@ namespace Client
             strClientDetails += strMacAddress + "#";
 
             // Machine Serial number
-            strClientDetails += KioskMachineSrNo + "#"; 
+            strClientDetails += KioskMachineSrNo + "#";
 
             //RMS Client Version
             strClientDetails += "V" + Assembly.GetExecutingAssembly().GetName().Version.ToString() + "/";
@@ -2072,7 +2109,7 @@ namespace Client
             strClientDetails += GetLipiRDService_Version() + "/";
 
             //RMS Client Monitor Version
-            strClientDetails += GetLipiRMSMonitor_Version() + "#";            
+            strClientDetails += GetLipiRMSMonitor_Version() + "#";
 
             //loop through each drive V1.0.0.6
             foreach (var drive in DriveInfo.GetDrives())
@@ -2089,33 +2126,33 @@ namespace Client
                 }
             }
 
-           
-
             strClientDetails += "#" + LastPatchUpdated;   // Last Patch Updated
+            objLog.WriteFile("KLocation : " + KioskLocation);
             strClientDetails += "#" + KioskLocation; //Kiosk Location
             strClientDetails += "#" + klat; //Kiosk Location
             strClientDetails += "#" + klong; //Kiosk Location
+
         }
-              
+
         void Connect()
         {
             //Create a client object to connect a server on 127.0.0.1 (local) IP and listens 10085 TCP port
             if (client == null)
             {
                 try
-                {                    
-                    client = ScsClientFactory.CreateClient(new ScsTcpEndPoint(WebHostIP, Convert.ToInt32(Port_No)));                  
+                {
+                    client = ScsClientFactory.CreateClient(new ScsTcpEndPoint(WebHostIP, Convert.ToInt32(Port_No)));
                 }
                 catch (Exception ex)
                 {
                     objLog.WriteFile("Exception in Connect(): " + ex.Message + Environment.NewLine + ex.StackTrace);
                     return;
                 }
-                
+
                 //Register to MessageReceived event to receive messages from server.
                 client.MessageReceived += Client_MessageReceived;
                 client.Connected += client_Connected;
-                client.Disconnected += client_Disconnected;               
+                client.Disconnected += client_Disconnected;
             }
 
             try
@@ -2143,7 +2180,7 @@ namespace Client
                     client.SendMessage(new ScsRawDataMessage(Encoding.Default.GetBytes("01")));   //Success
                 }
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 objLog.WriteFile("Exception in client_Connected() : " + ex.Message);
             }
@@ -2154,7 +2191,7 @@ namespace Client
             client.Disconnect();
             objLog.WriteFile("Client disconnected");
             bIsServiceConnectivityPresent = false;
-            GC.Collect();           
+            GC.Collect();
             client = null;  //Lokesh Add[10 May 2013]
         }
 
@@ -2163,12 +2200,12 @@ namespace Client
             //if (InvokeRequired)
             //    this.Invoke(new MethodInvoker(delegate { ErrorMsg.Visible = false; }));
             bIsTcpConnectivityPresent = false;
-            objLog.WriteFile("Command Socket Disconnected.(Shutdown Method)");            
+            objLog.WriteFile("Command Socket Disconnected.(Shutdown Method)");
         }
-        
+
         public void Client_MessageReceived(object sender, MessageEventArgs e)
         {
-            
+
             //Client only accepts text messages
             var message = e.Message as ScsRawDataMessage;
             if (message == null)
@@ -2194,7 +2231,7 @@ namespace Client
 
                 objLog.WriteFile("Try to Patch Download in Client_PatchDownload : " + patchName);
 
-                string result = objWC.UploadString(RMS_ServerInfo + "/PatchUpdate", "POST", "");             
+                string result = objWC.UploadString(RMS_ServerInfo + "/PatchUpdate", "POST", "");
 
                 MemoryStream memstrToReceive = new MemoryStream(Encoding.UTF8.GetBytes(result));
                 DataContractJsonSerializer objJsonSerRecv = new DataContractJsonSerializer(typeof(ResPatchUpdate));
@@ -2210,7 +2247,7 @@ namespace Client
                     File.WriteAllBytes(DownloadPath + "PATCH\\" + objNewPatchName.PatchName, Convert.FromBase64String(objNewPatchName.PatchData));
                     objClientConfigINI.Write("Kiosk_Details", "PatchReceived", objNewPatchName.PatchName);
                     objLog.WriteFile("File saved:" + objNewPatchName.PatchName);
-                    
+
                     objLog.WriteFile("Patch name updated in ini file : " + objNewPatchName.PatchName);
 
                     client.SendMessage(new ScsRawDataMessage(Encoding.Default.GetBytes("50#S")));  //OK
@@ -2344,7 +2381,7 @@ namespace Client
         {
             bool bIsDriveEnable = false;
             try
-            {   
+            {
                 Registry.SetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer", "NoViewOnDrive", 0, RegistryValueKind.DWord);
                 objLog.WriteFile("DriveEnable C and D Success");
                 bIsDriveEnable = true;
@@ -2419,7 +2456,7 @@ namespace Client
                 bIsUSBDisable = true;
             }
             catch (Exception ex)
-            {   
+            {
                 objLog.WriteFile("Exception in USBDisable - " + ex.Message);
                 bIsUSBDisable = false;
             }
@@ -2455,7 +2492,7 @@ namespace Client
         {
             try
             {
-                int dateDifference = 0;              
+                int dateDifference = 0;
                 DateTime dtIterator;
                 string szFileZipPath = "";
                 DateTime fromdate;
@@ -2568,7 +2605,7 @@ namespace Client
         public string UploadCameraImages(string strTXNDate, string strTxnID)
         {
             string szFileZipPath = DownloadPath + "Log\\CameraImages_" + strTxnID.ToLower() + "_" + DateTime.Now.ToString("yyMMdd_HHmmss") + ".zip";
-            string strCameraPath = "D:\\CameraImages\\" + strTXNDate + "\\" + strTxnID;           
+            string strCameraPath = "D:\\CameraImages\\" + strTXNDate + "\\" + strTxnID;
             if (Directory.Exists(strCameraPath))
             {
                 using (ZipFile zip = new ZipFile(szFileZipPath))
@@ -2576,7 +2613,7 @@ namespace Client
                     //Loop through all directories to seaarch for files
                     foreach (string file in Directory.GetFiles(strCameraPath, "*.jpg"))
                     {
-                        zip.AddFile(file, strTxnID + "\\") ;
+                        zip.AddFile(file, strTxnID + "\\");
                         objLog.WriteFile("Zip add image file- " + file);
                     }
                     zip.Save();
@@ -2590,7 +2627,7 @@ namespace Client
             }
         }
 
-        private void PatchInstaller(string strPatchPath,string strPatchName)
+        private void PatchInstaller(string strPatchPath, string strPatchName)
         {
             KillApplication();
 
@@ -2616,8 +2653,8 @@ namespace Client
 
         private void PatchInstallerClient(string strPatchPath, string strPatchName)
         {
-            
-           // Thread.Sleep(1000);
+
+            // Thread.Sleep(1000);
             Extract(strPatchPath, strPatchName);
             Process[] procs = Process.GetProcessesByName("Remote Client");
             foreach (Process proc in procs)
@@ -2626,7 +2663,7 @@ namespace Client
                 objLog.WriteFile("Client Application Successfully Killed.");
             }
         }
-     
+
         public void DateTimeChange(string DateTime)
         {
             try
@@ -2660,7 +2697,7 @@ namespace Client
                             objLog.WriteFile("Extract File Name: " + e.ToString());
                         }
                     }
-                  
+
                     Application.DoEvents();
                     //zp.Dispose();
                     objLog.WriteFile("ISO8583CFG.xml Installed Successfully");
@@ -2775,7 +2812,7 @@ namespace Client
 
                 }
                 else if (strPatchName.ToLower().Contains("remote client"))
-                    {
+                {
                     if (strPatchPath != null)
                     {
                         using (ZipFile zip = ZipFile.Read(strPatchPath + "\\" + strPatchName))
@@ -2821,9 +2858,9 @@ namespace Client
                     }
 
 
-                 }
-
                 }
+
+            }
             catch (Exception e)
             {
                 objLog.WriteFile("Exception in  Extract() function" + e.Message + Environment.NewLine + e.StackTrace);
@@ -2832,7 +2869,7 @@ namespace Client
 
         private void SendAntiVirusDate(string strBatchfilePath)
         {
-#region  added by Rajesh V11.0.0.15
+            #region  added by Rajesh V11.0.0.15
             try
             {
                 objLog.WriteFile("SendAntiVirusDate start");
@@ -2910,7 +2947,7 @@ namespace Client
             {
                 objLog.WriteFile("Exception in antivirus Date send SendAntiVirusDate():" + ex.Message + Environment.NewLine + ex.StackTrace);
             }
-        #endregion
+            #endregion
         }
 
         private bool AntiVirusBatchFile(string strFileName)
@@ -3199,7 +3236,7 @@ namespace Client
             if (LogicalDrives.Contains("D:\\"))
             {
                 DownloadPath = "D:\\DownloadPath\\";
-               // DownTimeRead = "D:\\RMS_TXN\\";
+                // DownTimeRead = "D:\\RMS_TXN\\";
                 try
                 {
                     if (!Directory.Exists(DownloadPath))
@@ -3208,8 +3245,8 @@ namespace Client
 
                         if (!Directory.Exists(DownloadPath + "LOG"))
                             Directory.CreateDirectory(DownloadPath + "LOG");
-                       // Directory.CreateDirectory("D:\\RMS_TXN");
-                       
+                        // Directory.CreateDirectory("D:\\RMS_TXN");
+
                         objLog.WriteFile("DownloadPath:" + DownloadPath);
                     }
                     else
@@ -3236,15 +3273,15 @@ namespace Client
                     if (!Directory.Exists(DownloadPath))
                     {
                         Directory.CreateDirectory(DownloadPath + "LOG");
-                     //   Directory.CreateDirectory("E:\\RMS_TXN");
+                        //   Directory.CreateDirectory("E:\\RMS_TXN");
                         Directory.CreateDirectory(DownloadPath);
                         objLog.WriteFile("DownloadPath:" + DownloadPath);
                     }
                     else
                     {
                         objLog.WriteFile("DownloadPath:" + DownloadPath);
-                     //   if (!Directory.Exists("E:\\RMS_TXN"))
-                    //        Directory.CreateDirectory("E:\\RMS_TXN");
+                        //   if (!Directory.Exists("E:\\RMS_TXN"))
+                        //        Directory.CreateDirectory("E:\\RMS_TXN");
                         if (!Directory.Exists(DownloadPath + "LOG"))
                             Directory.CreateDirectory(DownloadPath + "LOG");
                     }
@@ -3264,7 +3301,7 @@ namespace Client
                     if (!Directory.Exists(DownloadPath))
                     {
                         Directory.CreateDirectory(DownloadPath + "LOG");
-                      //  Directory.CreateDirectory("F:\\RMS_TXN");
+                        //  Directory.CreateDirectory("F:\\RMS_TXN");
                         Directory.CreateDirectory(DownloadPath);
                         objLog.WriteFile("DownloadPath:" + DownloadPath);
                     }
@@ -3272,7 +3309,7 @@ namespace Client
                     {
                         objLog.WriteFile("DownloadPath:" + DownloadPath);
                         //if (!Directory.Exists("F:\\RMS_TXN"))
-                       //     Directory.CreateDirectory("F:\\RMS_TXN");
+                        //     Directory.CreateDirectory("F:\\RMS_TXN");
                         if (!Directory.Exists(DownloadPath + "LOG"))
                             Directory.CreateDirectory(DownloadPath + "LOG");
                     }
@@ -3285,14 +3322,14 @@ namespace Client
             else
             {
                 DownloadPath = "C:\\DownloadPath\\";
-              //  DownTimeRead = "C:\\RMS_TXN\\";
+                //  DownTimeRead = "C:\\RMS_TXN\\";
 
                 try
                 {
                     if (!Directory.Exists(DownloadPath))
                     {
                         Directory.CreateDirectory(DownloadPath + "LOG");
-                     //   Directory.CreateDirectory("C:\\RMS_TXN");
+                        //   Directory.CreateDirectory("C:\\RMS_TXN");
                         Directory.CreateDirectory(DownloadPath);
                         objLog.WriteFile("DownloadPath:" + DownloadPath);
                     }
@@ -3300,7 +3337,7 @@ namespace Client
                     {
                         objLog.WriteFile("DownloadPath:" + DownloadPath);
                         //if (!Directory.Exists("C:\\RMS_TXN"))
-                       //     Directory.CreateDirectory("C:\\RMS_TXN");
+                        //     Directory.CreateDirectory("C:\\RMS_TXN");
                         if (!Directory.Exists(DownloadPath + "LOG"))
                             Directory.CreateDirectory(DownloadPath + "LOG");
                     }
@@ -3340,7 +3377,7 @@ namespace Client
         }
 
         private void notifyIcon1_MouseClick(object sender, MouseEventArgs e)
-        {          
+        {
         }
     }
 
@@ -3355,7 +3392,7 @@ namespace Client
     public class ResDownloadData
     {
         public bool Result;
-        public string DownalodData;        
+        public string DownalodData;
         public string Error;
     }
     public class LogDetails
@@ -3535,7 +3572,7 @@ namespace Client
                     strArray[i] = strArray[i].Substring(strArray[i].LastIndexOf('=') + 1).ToLower();
                 }
             }
-            catch (Exception ) { }//EventLog.WriteEntry("LipiWhiteListing", "Exception Message: " + ex.Message, //EventLogEntryType.Error); }
+            catch (Exception) { }//EventLog.WriteEntry("LipiWhiteListing", "Exception Message: " + ex.Message, //EventLogEntryType.Error); }
 
             return strArray;
         }
@@ -3545,26 +3582,26 @@ namespace Client
             set { this.filePath = value; }
         }
     }
-#endregion
-#region > Thread Safe Helper Class <
+    #endregion
+    #region > Thread Safe Helper Class <
     class ThreadSafe
     {
-#region > Thread Safe Delegates <
+        #region > Thread Safe Delegates <
         delegate void Delegate_String(Control TargetControl, string Text);
         delegate void Delegate_Boolean(Control TargetControl, bool Boolean, ControlBooleanType CType);
         delegate string Delegate_GetString(Control TargetControl, bool GetBoolean);
-#endregion
-#region > Declaration Area <
-#region > Static Vartiables <
+        #endregion
+        #region > Declaration Area <
+        #region > Static Vartiables <
         static Delegate_String Ptr_String = new Delegate_String(SetString);
         static Delegate_Boolean Ptr_Boolean = new Delegate_Boolean(SetBoolean);
         static Delegate_GetString Ptr_GetString = new Delegate_GetString(GetString);
-#endregion
-#region > Public Enums <
+        #endregion
+        #region > Public Enums <
         public enum ControlBooleanType { Control_Enabled, TextBox_ReadOnly };
-#endregion
-#endregion
-#region > Public Functions <
+        #endregion
+        #endregion
+        #region > Public Functions <
         public static void SetString(Control TargetControl, string String)
         {
             try
@@ -3609,9 +3646,9 @@ namespace Client
             if (GetBoolean) return ((TargetControl as RadioButton).Checked.ToString());
             else return ((TargetControl as TextBox).Text);
         }
-#endregion
+        #endregion
     }
-#endregion
-#endregion
+    #endregion
+    #endregion
 }
 #endregion

@@ -69,6 +69,7 @@ public class AesGcm256
 
     public static string Encrypt(byte[] PlainText)
     {
+
         string sR = string.Empty;
         try
         {
