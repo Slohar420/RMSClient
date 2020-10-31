@@ -82,6 +82,7 @@ namespace Client
         string KioskIP = "";
         string StartTime = "";
         string EndTime = "";
+        string kdate = "";
         string UpHours = "";
         string klat = "";
         string klong = "";
@@ -224,6 +225,7 @@ namespace Client
             try
             {
 
+
                 this.Text = "Lipi Remote Client V" + Assembly.GetExecutingAssembly().GetName().Version.ToString();
                 notifyIcon1.Text = this.Text;
 
@@ -239,6 +241,7 @@ namespace Client
                 GetLogicalDrives();
 
                 ReadKioskDetails();
+                WriteDownTime();
 
                 //Connect();   //Client Connect Directly No wait 10 Sec...
 
@@ -276,8 +279,9 @@ namespace Client
                 _fileWatcherHealth.Changed += new FileSystemEventHandler(OnChangedHealth);
                 _fileWatcherHealth.EnableRaisingEvents = true;
 
-                TxnSchedulerTick.Interval = 1 * 60 * 1000;
+                
                 TxnSchedulerTick.Tick += new EventHandler(TxnSchedulerTimer_Tick);
+                TxnSchedulerTick.Interval = 1 * 60 * 10;
                 TxnSchedulerTick.Enabled = true;
 
                 objLog.WriteFile("Timer Started");
@@ -290,7 +294,7 @@ namespace Client
                 ShowWindow(hwnd, SW_HIDE);
 
                 objClientConfigINI.Write("Kiosk_Details", "StartTime", DateTime.Now.ToString("ddMMyyyy_") + "000001");
-                objClientConfigINI.Write("Kiosk_Details", "EndTime", DateTime.Now.ToString("ddMMyyyy_") + "230059");
+                objClientConfigINI.Write("Kiosk_Details", "EndTime", DateTime.Now.ToString("ddMMyyyy_") + "235959");
             }
             catch (Exception ex)
             {
@@ -322,6 +326,14 @@ namespace Client
             this.ShowInTaskbar = false;
             this.WindowState = FormWindowState.Minimized;
             notifyIcon1.Visible = true;
+        }
+        private void WriteDownTime()
+        {
+
+            if (objClientHealthINI.Read("DownTime", "StartTime", "") == "")
+            {
+                objClientHealthINI.Write("DownTime", "StartTime", DateTime.Now.ToString("HH:mm:ss"));
+            }
         }
 
         private void ReadKioskDetails()
@@ -537,6 +549,8 @@ namespace Client
             lock (objlock)
             {
                 objLog.WriteFile("In ServiceThreadTxnHealth Function");
+
+                bool bSensorConnected = false;
                 while (true)
                 {
                     try
@@ -545,30 +559,25 @@ namespace Client
                         {
                             try
                             {
-                                objClientConfigINI.Write("Kiosk_Details", "StartTime", DateTime.Now.ToString("ddMMyyyy_") + "000001");
-                                objClientConfigINI.Write("Kiosk_Details", "EndTime", DateTime.Now.ToString("ddMMyyyy_") + "230059");
-                                //ManagementObjectSearcher deviceList = new ManagementObjectSearcher("Select Name, Status, DeviceID from Win32_PnPEntity");
+                                ManagementObjectSearcher deviceList = new ManagementObjectSearcher("Select Name, Status, DeviceID from Win32_PnPEntity");
 
-                                //string DevName_Touch = objClientHealthINI.Read("Device_DriverName", "TouchScreen", "");                               
+                                string DevName_Touch = objClientHealthINI.Read("Device_DriverName", "TouchScreen", "");
 
                                 // Any results? There should be!
-                                //if (deviceList != null)
-                                //{
-                                //    // Enumerate the devices
-                                //    foreach (ManagementObject device in deviceList.Get())    //To Get Status of USB Device 
-                                //    {
+                                if (deviceList != null)
+                                {
+                                    // Enumerate the devices
+                                    foreach (ManagementObject device in deviceList.Get())    //To Get Status of USB Device 
+                                    {
 
-                                //        if (device.GetPropertyValue("Name") != null && device.GetPropertyValue("Name").ToString().ToLower().Contains(DevName_Touch.ToLower()))
-                                //        {
-                                //            bTouchScreenFound = true;
-                                //        }
-                                //    }
+                                        if (device.GetPropertyValue("Name") != null && device.GetPropertyValue("Name").ToString().ToLower().Contains("silicon labs cp210x us"))
+                                        {
+                                            bSensorConnected = true;
+                                        }
+                                    }
 
-                                //    if (bTouchScreenFound)
-                                //        objClientHealthINI.Write("Health_Details", "D1", "Connected");
-                                //    else
-                                //        objClientHealthINI.Write("Health_Details", "D1", "Disconnected");
-                                //}
+                                }
+
                             }
                             catch (Exception ex)
                             {
@@ -584,21 +593,47 @@ namespace Client
                                 strDeviceData += "#" + (strTemp != "" ? strTemp : "Unknown");
                             }
 
-                            if (objClientConfigINI.Read("Kiosk_Details", "StartTime", "").Split('_')[0].Trim() == DateTime.Today.ToString("ddMMyyyy"))
-                            {
-                                int healthSentCount = Convert.ToInt32(objClientConfigINI.Read("Kiosk_Details", "healthSentCount", "0")) + 1;
-                                double healthSentPercentage = healthSentCount * 100 / 48;
-                                double UpTime = healthSentCount * 30;
+                            //if (objClientConfigINI.Read("Kiosk_Details", "StartTime", "").Split('_')[0].Trim() == DateTime.Today.ToString("ddMMyyyy"))
+                            //{
+                            //    int healthSentCount = Convert.ToInt32(objClientConfigINI.Read("Kiosk_Details", "healthSentCount", "0")) + 1;
+                            //    double healthSentPercentage = healthSentCount * 100 / 48;
+                            //    double UpTime = healthSentCount * 30;
 
-                                TimeSpan elapsed = TimeSpan.FromMinutes(UpTime);
-                                UpHours = elapsed.ToString().Replace(":", "");
-                                objClientConfigINI.Write("Kiosk_Details", "UpTime", UpHours.ToString());
-                                objClientConfigINI.Write("Kiosk_Details", "healthSentCount", healthSentCount.ToString());
-                            }
-                            else
+                            //    TimeSpan elapsed = TimeSpan.FromMinutes(UpTime);
+                            //    UpHours = elapsed.ToString().Replace(":", "");
+                            //    objClientConfigINI.Write("Kiosk_Details", "UpTime", UpHours.ToString());
+                            //    objClientConfigINI.Write("Kiosk_Details", "healthSentCount", healthSentCount.ToString());
+                            //}
+                            //else
+                            //{
+                            //    objClientConfigINI.Write("Kiosk_Details", "UpTime", "003000");
+                            //    objClientConfigINI.Write("Kiosk_Details", "healthSentCount", "1");
+                            //    objClientConfigINI.Write("Kiosk_Details", "StartTime", DateTime.Now.ToString("ddMMyyyy_") + "000001");
+                            //    objClientConfigINI.Write("Kiosk_Details", "EndTime", DateTime.Now.ToString("ddMMyyyy_") + "235959");
+                            //}
+
+                            StartTime = "000001";
+                            EndTime = "235900";
+                            string sensorStatus = bSensorConnected ? "Connected" : "Disconnected";  // vibration sensor connectivity checking
+
+                            string strDownTimeText;
+                            var fileStream = new FileStream(Application.StartupPath + "\\DownTime.txt", FileMode.Open, FileAccess.Read);
+                            using (var streamReader = new StreamReader(fileStream, Encoding.UTF8))
                             {
-                                objClientConfigINI.Write("Kiosk_Details", "UpTime", "0");
-                                objClientConfigINI.Write("Kiosk_Details", "healthSentCount", "0");
+                                strDownTimeText = streamReader.ReadToEnd();
+
+                            }
+
+                            string[] strSplitDownTime = strDownTimeText.Split('\n');
+                            int upTimeDetailCount = strSplitDownTime.Where(r => r != "").Count();
+
+                            for (int i = 0; i < upTimeDetailCount; i++)
+                            {
+                                string[] objdownTime = strSplitDownTime[i].Split('#');
+                                kdate = Convert.ToString(objdownTime[1]);
+                                StartTime = Convert.ToString(objdownTime[3]);
+                                EndTime= Convert.ToString(objdownTime[4]);
+                                UpHours= Convert.ToString(objdownTime[2]);
                             }
 
                             //Now Sending The Health Data
@@ -608,6 +643,8 @@ namespace Client
                                                    + "$" + DateTime.Now.ToString("yyyyMMdd HH:mm:ss")
                                                    + "$" + objClientHealthINI.Read("Health_Details", "DeviceCount", "0")
                                                    + strDeviceData
+                                                   + "$" + (bSensorConnected ? "Connected" : "Disconnected")
+                                                   + "$" + kdate
                                                    + "$" + EndTime
                                                    + "$" + StartTime
                                                    + "$" + UpHours
@@ -620,6 +657,9 @@ namespace Client
 
 
                             objLog.WriteFile("HealthData  Message For Sending:- " + HealthData);
+
+                           
+
 
                             try
                             {
@@ -810,7 +850,7 @@ namespace Client
                                 thEstablishedNetwork.Start();
                             }
 
-                            iSleepMode = 1 * 60 * 1000;
+                            iSleepMode = 1 * 60 * 10;
                         }
                     }
                     catch (Exception ex)
@@ -1939,18 +1979,12 @@ namespace Client
         {
             try
             {
-                //this.Invoke(new MethodInvoker(delegate { TxnSchedulerTick.Enabled = false; }));
-
-                //string strPreviousDate = objClientConfigINI.Read("Kiosk_Details", "PreviousDate", "");
-                //if (strPreviousDate != DateTime.Now.ToString("dd_MM_yyyy"))
-                //{
-                //    objLog.WriteFile("Date changed : upload ej data " + strPreviousDate);
-
-                //    //To upload EJ Data on date changed
-                //    string strZipFilePath = UploadLogEJ(strPreviousDate, strPreviousDate);
-                //    if (strZipFilePath != "")
-                //        LipiUploadData(LocalIPAddress(), strZipFilePath);
-                //}
+                this.Invoke(new MethodInvoker(delegate { TxnSchedulerTick.Enabled = false; }));
+                CalculateDownTime();
+                if (DateTime.Now.Minute % 15 == 0)
+                {
+                    //   RecentHelathData();
+                }
             }
             catch (Exception ex)
             {
@@ -1962,6 +1996,120 @@ namespace Client
             }
         }
 
+        public void CalculateDownTime()
+        {
+            try
+            {
+                bool bTotalDownUpdated = false;
+                DateTime objFileDT, objTempDt;
+                TimeSpan objTS;
+                string Excp = "";
+
+                // Read the last time file was updated
+                if (objClientHealthINI.IniReadDateValue("DownTime", "LastUpdated", out objFileDT, out Excp))
+                {
+                    // Added Log [Shubhit 03May13]
+                    objLog.WriteFile("Last updated date time read - " + objFileDT.ToString("yyyy-MM-dd HH:mm:ss"));
+
+                    // If the last file updated date and todays date are different
+                    //if (objFileDT.ToString("ddMMyy") != DateTime.Now.ToString("ddMMyy"))
+                    //Changed condition to check date difference Pankaj 19JAN15
+                    if ((DateTime.Today - objFileDT).TotalDays > 0)
+                    {
+                        // Write the previous values of the date when the file was last updated
+                        WriteDownTimeFile((objClientHealthINI.IniReadDoubleValue("DownTime", "PowerDown") + ((objFileDT.Hour < 23) ? ((24 * 60) - (objFileDT.Hour * 60 + objFileDT.Minute)) : 0)).ToString(),
+                                          objFileDT,
+                                          objClientHealthINI.Read("DownTime", "StartTime", "").ToString());      // Updated for V1.0.0.3
+
+                        // Added Log [Shubhit 03May13]
+                        objLog.WriteFile("Writing downtime of - " + objFileDT.ToString("ddMMyy"));
+
+                        // Create a datetime object of next date starting
+                        objTempDt = new DateTime(objFileDT.Year, objFileDT.Month, objFileDT.Day, 0, 0, 0);
+
+                        // Update for V1.0.0.2 [Shubhit]
+                        objTempDt = objTempDt.AddDays(1);
+
+                        // Loop that date value upto todays date, if not equal then write its corresponding Kiosk Shutdwon time
+                        // while (objTempDt.ToString("ddMMyy") != DateTime.Now.ToString("ddMMyy"))
+                        //Changed condition to check date difference Pankaj 19JAN15
+                        while ((DateTime.Today - objTempDt).TotalDays > 0)
+                        {
+                            WriteDownTimeFile((24 * 60).ToString(), objTempDt, "NA");    // Updated for V1.0.0.3 //V6.1.1.1  Removing barcode calculation
+
+                            // Added Log [Shubhit 03May13]
+                            objLog.WriteFile("Writing downtime of - " + objTempDt.ToString("ddMMyy"));
+
+                            objTempDt = objTempDt.AddDays(1);
+                        }
+
+                        // Blank all the devices counters, and set kiosk counter to the difference of current time and midnight time
+                        // And update the last updated counter to current time
+                        //objClientDownTimeINI.Write("DownTime", "D1", "0");
+                        // objClientDownTimeINI.Write("DownTime", "D2", "0"); //V6.1.1.1  Removing barcode calculation
+                        //objClientDownTimeINI.Write("DownTime", "Application", "0");
+                        objClientHealthINI.Write("DownTime", "TotalDown", "0");
+                        objClientHealthINI.Write("DownTime", "PowerDown", (Convert.ToInt32(DateTime.Now.ToString("HH")) * 60 + Convert.ToInt32(DateTime.Now.ToString("mm"))).ToString());
+                        objClientHealthINI.Write("DownTime", "StartTime", DateTime.Now.ToString("HH:mm:ss"));    // For V1.0.0.3
+                        objClientHealthINI.Write("DownTime", "LastUpdated", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+
+                        // Added Log [Shubhit 03May13]
+                        objLog.WriteFile("Writing Kiosk Down minutes of - " + DateTime.Now.ToString("ddMMyy"));
+                    }
+                    else if ((DateTime.Now - objFileDT).TotalMinutes > 20)
+                    {
+                        objClientHealthINI.Write("DownTime", "PowerDown", (Math.Floor((DateTime.Now - objFileDT).TotalMinutes + objClientHealthINI.IniReadDoubleValue("DownTime", "PowerDown"))).ToString());
+                        objLog.WriteFile("Write Power down minutes :" + objClientHealthINI.IniReadDoubleValue("DownTime", "PowerDown").ToString());
+                    }
+
+                    // Read the last updated time again
+                    objClientHealthINI.IniReadDateValue("DownTime", "LastUpdated", out objFileDT, out Excp);    // Updated [Shubhit 03May13]
+
+                    // Added Log [Shubhit 03May13]
+                    objLog.WriteFile("Read last updated date time - " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+
+
+
+                    objClientHealthINI.Write("DownTime", "LastUpdated", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+
+                    // Added Log [Shubhit 03May13]
+                    objLog.WriteFile("Write last update date time - " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                }
+                else
+                {
+                    // Added Log [Shubhit 03May13]
+                    objLog.WriteFile("Excp in IniReadDateValue() - " + Excp);
+
+                    objClientHealthINI.Write("DownTime", "LastUpdated", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                }
+            }
+            catch (Exception excp)
+            {
+                // Added Log [Shubhit 03May13]
+                objLog.WriteFile("Excp in CalculateDownTime() - " + excp.Message);
+            }
+        }
+
+        public void WriteDownTimeFile(string inKiosk, DateTime inDate, string inStartTime)
+        {
+            try
+            {
+                using (StreamWriter objSW = new StreamWriter(Application.StartupPath + "\\DownTime.txt", true))
+                {
+                    // Changed for V1.0.0.3
+                    if (inStartTime == "NA")
+                        objSW.WriteLine("20#" + inDate.ToString("yyMMdd") + "#" + inKiosk + "#" + //V6.1.1.1  Removing barcode calculation
+                                        "##");
+                    else
+                        objSW.WriteLine("20#" + inDate.ToString("yyMMdd") + "#" +
+                                        inKiosk + "#" + inStartTime + "#" + inDate.ToString("HH:mm:ss") + "#");
+                }
+            }
+            catch (Exception excp)
+            {
+                objLog.WriteFile("Excp in WriteDownTimeFile() - " + excp.Message.ToString());
+            }
+        }
 
         protected override bool ProcessCmdKey(ref System.Windows.Forms.Message msg, Keys keyData)
         {

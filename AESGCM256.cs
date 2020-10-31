@@ -137,7 +137,7 @@ public class AesGcm256
 
             byte[] encryptedBytes = Convert.FromBase64String(EncryptedText);
 
-            GcmBlockCipher cipher = new GcmBlockCipher(new AesFastEngine());
+            GcmBlockCipher cipher = new GcmBlockCipher(new AesEngine());
             AeadParameters parameters =
                       new AeadParameters(new KeyParameter(key), 128, iv, null);
             //ParametersWithIV parameters = new ParametersWithIV(new KeyParameter(key), iv);
